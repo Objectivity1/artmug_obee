@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GIF Galleries (Tabs + Auto)</title>
+<title>GIF Galleries (Tabs + Auto, Still Thumbs)</title>
 <style>
   html,body{overscroll-behavior-y:none}
   body{
@@ -59,6 +59,59 @@
 
 <!-- 경량 GIF 파서: 썸네일용 첫 프레임 추출 -->
 <script src="https://unpkg.com/gifuct-js/dist/gifuct.min.js"></script>
+<script>
+// CDN 로드 지연/차단 케이스 대비: 준비될 때까지 기다리는 유틸
+function ensureGifuctReady(maxAttempts=8, delay=400){
+  return new Promise((resolve,reject)=>{
+    let n=0;
+    const tick=()=>{
+      if (window.gifuct && window.gifuct.parseGIF && window.gifuct.decompressFrames){
+        resolve(true);
+      } else if (++n >= maxAttempts){
+        resolve(false); // 준비 안 됨 → 썸네일 원본 사용(애니메이션 허용)
+      } else {
+        setTimeout(tick, delay);
+      }
+    };
+    tick();
+  });
+}
+
+// 첫 프레임 PNG dataURL 캐시 (리로드/탭 전환시 재사용)
+const thumbCache = new Map();
+
+async function gifFirstFrameDataURL(url){
+  if (thumbCache.has(url)) return thumbCache.get(url);
+
+  const ready = await ensureGifuctReady();
+  if (!ready) { thumbCache.set(url, null); return null; }
+
+  try{
+    const { parseGIF, decompressFrames } = window.gifuct;
+    const res = await fetch(url, {cache:'force-cache'});
+    const buf = await res.arrayBuffer();
+    const gif = parseGIF(buf);
+    const frames = decompressFrames(gif, true);
+    const f = frames[0];
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = gif.lsd.width;
+    canvas.height = gif.lsd.height;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(f.dims.width, f.dims.height);
+    imgData.data.set(f.patch);
+    ctx.putImageData(imgData, f.dims.left, f.dims.top);
+
+    const dataURL = canvas.toDataURL('image/png');
+    thumbCache.set(url, dataURL);
+    return dataURL;
+  }catch(e){
+    console.warn('gifFirstFrameDataURL failed for', url, e);
+    thumbCache.set(url, null);
+    return null;
+  }
+}
+</script>
 </head>
 <body>
 <div id="amg">
@@ -125,33 +178,6 @@
     catch(e){ return await listByProbe(dir,999); }
   }
 
-  // --- GIF 첫 프레임을 dataURL(PNG)로 추출 ---
-  async function gifFirstFrameDataURL(url){
-    try{
-      if (!window.gifuct || !window.gifuct.parseGIF) return null;
-      const { parseGIF, decompressFrames } = window.gifuct;
-      const res = await fetch(url, {cache:'force-cache'});
-      const buf = await res.arrayBuffer();
-
-      const gif = parseGIF(buf);
-      const frames = decompressFrames(gif, true);
-      const f = frames[0];
-
-      const canvas = document.createElement('canvas');
-      canvas.width  = gif.lsd.width;
-      canvas.height = gif.lsd.height;
-      const ctx = canvas.getContext('2d');
-
-      const imgData = ctx.createImageData(f.dims.width, f.dims.height);
-      imgData.data.set(f.patch);
-      ctx.putImageData(imgData, f.dims.left, f.dims.top);
-
-      return canvas.toDataURL('image/png');
-    }catch(e){
-      return null;
-    }
-  }
-
   function renderGallery(imgs){
     if(!imgs.length){
       strip.innerHTML='<div class="empty">이미지 없음</div>';
@@ -160,16 +186,22 @@
     }
     strip.innerHTML='';
 
+    const TRANSPARENT_PX = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>';
+
     imgs.forEach((src,i)=>{
       const b=document.createElement('button');
       b.className='amg_th'; b.dataset.src=src;
 
       const im=document.createElement('img');
       im.alt=`썸네일 ${i+1}`;
-      im.src=src;
+      im.decoding='async';
+      im.loading='lazy';
+      im.src=TRANSPARENT_PX; // ✅ 처음엔 투명 1px → 애니메이션 깜빡임 방지
+
+      // 첫 프레임 만들어서 주입 (실패시 원본 GIF로 폴백 허용? → 사용자가 정지 원하므로 폴백 안 함)
       gifFirstFrameDataURL(src).then(url=>{
-        if(url) im.src = url;
-      }).catch(()=>{});
+        im.src = url || src; // 라이브러리 실패시만 GIF로 폴백
+      });
 
       b.appendChild(im); strip.appendChild(b);
     });
