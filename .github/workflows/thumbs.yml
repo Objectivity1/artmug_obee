@@ -4,9 +4,9 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - "A-1images/**.gif"
-      - "A-2images/**.gif"
-      - "Bimages/**.gif"
+      - "A-1images/*.gif"
+      - "A-2images/*.gif"
+      - "Bimages/*.gif"
 
 jobs:
   make-thumbs:
