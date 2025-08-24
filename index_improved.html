@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GIF Gallery (size kept, features improved)</title>
+  <style>
+    html, body { overscroll-behavior-y: none; }
+    #amg {
+      border:1px solid #eee; border-radius:12px; padding:12px;
+      max-width: 520px; margin: 0 auto;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', 'Malgun Gothic', Helvetica, Arial, sans-serif;
+    }
+    #amg .stage { position:relative; border:1px solid #eee; border-radius:12px; padding:12px; text-align:center; }
+    #amg #amg_main { width:450px; max-width:100%; display:inline-block; border-radius:8px; pointer-events:none; }
+    #amg .nav {
+      position:absolute; top:50%; transform:translateY(-50%);
+      width:40px; height:40px; border-radius:999px; border:0;
+      background:rgba(0,0,0,.45); color:#fff; font-size:20px;
+      cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;
+    }
+    #amg #amg_prev { left:8px; }
+    #amg #amg_next { right:8px; }
+
+    #amg #amg_strip {
+      margin-top:10px; display:flex; gap:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:6px 2px;
+      overscroll-behavior: contain;  /* stop scroll chaining */
+      touch-action: pan-x;           /* horizontal only */
+      scrollbar-gutter: stable both-edges;
+    }
+    #amg .amg_th {
+      flex: 0 0 calc((100% - 7*10px)/8);
+      border:2px solid #ddd; border-radius:8px; padding:0; background:#fff; cursor:pointer;
+      outline: none;
+    }
+    #amg .amg_th img { display:block; width:100%; height:100px; object-fit:cover; border-radius:6px; pointer-events:none; }
+    #amg .amg_th.active { border-color:#7aa7ff; }
+  </style>
+</head>
+<body>
+  <div id="amg">
+    <div class="stage">
+      <img id="amg_main" src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133470.gif" alt="미리보기" referrerpolicy="no-referrer">
+      <button id="amg_prev" class="nav" type="button" aria-label="이전">‹</button>
+      <button id="amg_next" class="nav" type="button" aria-label="다음">›</button>
+    </div>
+    <div id="amg_strip">
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133470.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133470.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133471.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133471.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133472.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133472.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133473.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133473.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311360.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311360.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311361.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311361.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311362.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311362.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311363.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311363.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311364.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311364.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311650.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311650.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311651.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311651.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311652.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311652.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394314490.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394314490.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311654.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311654.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311930.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311930.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311931.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311931.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311932.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17394311932.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133474.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133474.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133860.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133860.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133861.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133861.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133862.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133862.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133863.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133863.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133864.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385133864.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134110.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134110.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134111.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134111.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134112.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134112.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134113.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134113.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134114.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134114.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134260.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134260.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134261.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134261.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134262.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134262.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134263.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134263.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134264.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134264.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134380.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134380.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134381.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134381.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134382.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134382.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134383.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134383.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+        <button class="amg_th" data-src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134384.gif"><img src="https://artmugfile6.mycafe24.com/image/up_img/detail/4/goods_45197/17385134384.gif" alt="썸네일" referrerpolicy="no-referrer" loading="lazy"></button>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var root = document.getElementById('amg'); if(!root) return;
+    var main = root.querySelector('#amg_main');
+    var prev = root.querySelector('#amg_prev');
+    var next = root.querySelector('#amg_next');
+    var strip= root.querySelector('#amg_strip');
+    var ths  = Array.prototype.slice.call(root.querySelectorAll('.amg_th'));
+    if(!main || !prev || !next || !ths.length) return;
+
+    var imgs = ths.map(function(b){ return b.getAttribute('data-src'); });
+    var idx = 0;
+
+    function highlight(){ ths.forEach(function(b,k){ b.classList.toggle('active', k===idx); }); }
+    function scrollThumb(center){
+      var t = ths[idx]; if(!t) return;
+      try { t.scrollIntoView({behavior:'smooth', inline:(center?'center':'nearest'), block:'nearest'}); }
+      catch(e) { /* older browsers */ t.scrollIntoView(); }
+    }
+    function show(i, opt){
+      idx = (i + imgs.length) % imgs.length;
+      main.src = imgs[idx];
+      highlight();
+      if (!opt || opt.scroll !== false) scrollThumb(true);
+    }
+
+    ths.forEach(function(btn,i){ btn.addEventListener('click', function(){ show(i); }); });
+    prev.addEventListener('click', function(){ show(idx-1); });
+    next.addEventListener('click', function(){ show(idx+1); });
+
+    // touch swipe on main
+    var startX=null;
+    main.addEventListener('touchstart', function(e){ startX = e.touches[0].clientX; }, {passive:true});
+    main.addEventListener('touchend', function(e){ 
+      if(startX===null) return;
+      var dx = e.changedTouches[0].clientX - startX;
+      if(Math.abs(dx)>40) show(idx + (dx<0?1:-1));
+      startX=null;
+    }, {passive:true});
+
+    // avoid auto-scroll on init
+    highlight();
+    show(0, {scroll:false});
+  })();
+  </script>
+</body>
+</html>
