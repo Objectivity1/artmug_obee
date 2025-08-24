@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GIF Galleries (Tabs + Auto, PNG thumbs)</title>
+<title>GIF Galleries (Tabs + Auto, GIF only)</title>
 <style>
   html,body{overscroll-behavior-y:none}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR','Malgun Gothic',Helvetica,Arial,sans-serif;margin:0}
@@ -17,7 +17,7 @@
   #amg_prev{left:8px} #amg_next{right:8px}
   #amg_strip{margin-top:10px;display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;overscroll-behavior:contain;touch-action:pan-x;scrollbar-gutter:stable both-edges}
   .amg_th{flex:0 0 calc((100% - 7*10px)/8);border:2px solid #ddd;border-radius:8px;padding:0;background:#fff;cursor:pointer;outline:none}
-  .amg_th img{display:block;width:100%;height:120px;object-fit:cover;border-radius:6px;pointer-events:none}
+  .amg_th img{display:block;width:100%;height:100px;object-fit:cover;border-radius:6px;pointer-events:none}
   .amg_th.active{border-color:#7aa7ff}
   .empty{color:#888;text-align:center;padding:20px 0}
 </style>
@@ -36,6 +36,7 @@
 
 <script>
 (() => {
+  // 탭/폴더 정의 (각 타입 최대 60장 가정)
   const GALLERIES = [
     { label:'A-1타입', dir:'A-1images' },
     { label:'A-2타입', dir:'A-2images' },
@@ -49,6 +50,7 @@
   const next   = document.getElementById('amg_next');
   const strip  = document.getElementById('amg_strip');
 
+  // 1) API 안 쓰고 1~60.gif만 HEAD 탐색 (연속 5번 없으면 중단)
   async function loadImagesByProbe(dir, maxTry=MAX_PER_DIR){
     const out=[]; let misses=0;
     for(let i=1;i<=maxTry;i++){
@@ -62,9 +64,16 @@
     return out;
   }
 
-  function thumbPathFromGif(gifPath){
-    return `thumbs/${gifPath.replace(/\.gif$/i, '.png')}`;
-  }
+  // 2) 썸네일 지연 로딩(IntersectionObserver)로 초기 네트워크 폭주 방지
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    for(const e of entries){
+      if(e.isIntersecting){
+        const img = e.target;
+        if(img.dataset.src){ img.src = img.dataset.src; img.removeAttribute('data-src'); }
+        io.unobserve(img);
+      }
+    }
+  }, { root: strip, rootMargin: '200px 0px', threshold: 0.01 }) : null;
 
   function renderGallery(imgs){
     if(!imgs.length){
@@ -74,23 +83,24 @@
       return;
     }
     prev.style.display = next.style.display = '';
-    strip.innerHTML = '';
 
+    strip.innerHTML = '';
     imgs.forEach((src, i) => {
-      const btn  = document.createElement('button');
-      btn.className = 'amg_th'; btn.dataset.src = src;
+      const b  = document.createElement('button');
+      b.className = 'amg_th'; b.dataset.src = src;
 
       const im = document.createElement('img');
       im.alt = `썸네일 ${i+1}`;
+      im.loading = 'lazy';
+      im.decoding = 'async';
+      // lazy: 보일 때만 실제 src 세팅
+      im.dataset.src = src;
+      im.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='; // 1x1 gif
 
-      const thumb = thumbPathFromGif(src);
-      // PNG 썸네일 우선 (없으면 잠깐 GIF 폴백)
-      fetch(thumb, { method:'HEAD', cache:'no-cache' })
-        .then(r => { im.src = r.ok ? thumb : src; })
-        .catch(() => { im.src = src; });
+      if(io) io.observe(im); else im.src = src;
 
-      btn.appendChild(im);
-      strip.appendChild(btn);
+      b.appendChild(im);
+      strip.appendChild(b);
     });
 
     const ths = Array.from(strip.querySelectorAll('.amg_th'));
@@ -98,7 +108,9 @@
     function highlight(){ ths.forEach((el,k)=>el.classList.toggle('active', k===idx)); }
     function show(i){
       idx = (i + imgs.length) % imgs.length;
-      main.src = imgs[idx]; highlight();
+      const src = imgs[idx];
+      if(main.src !== src) main.src = src;
+      highlight();
       try{ ths[idx].scrollIntoView({behavior:'smooth', inline:'center'}); }catch{}
     }
     ths.forEach((b,i)=> b.onclick = () => show(i));
@@ -133,6 +145,7 @@
     g.el = btn; tabsEl.appendChild(btn);
   });
 
+  // 첫 탭
   activateTab(GALLERIES[0]);
 })();
 </script>
