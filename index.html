@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GIF Galleries (Tabs + Auto)</title>
+<style>
+  html,body{overscroll-behavior-y:none}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR','Malgun Gothic',Helvetica,Arial,sans-serif;margin:0}
+  #amg{max-width:1000px;margin:24px auto;padding:16px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;justify-content:center;}
+  .tab{border:1px solid #ddd;background:#fafafa;border-radius:999px;padding:8px 14px;cursor:pointer;user-select:none}
+  .tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+  .stage{position:relative;border:1px solid #eee;border-radius:12px;padding:12px;text-align:center}
+  #amg_main{width:800px;max-width:100%;display:inline-block;border-radius:8px;pointer-events:none}
+  .nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:999px;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:20px;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center}
+  #amg_prev{left:8px} #amg_next{right:8px}
+  #amg_strip{margin-top:10px;display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;overscroll-behavior:contain;touch-action:pan-x;scrollbar-gutter:stable both-edges}
+  .amg_th{flex:0 0 calc((100% - 7*10px)/8);border:2px solid #ddd;border-radius:8px;padding:0;background:#fff;cursor:pointer;outline:none}
+  .amg_th img{display:block;width:100%;height:120px;object-fit:cover;border-radius:6px;pointer-events:none}
+  .amg_th.active{border-color:#7aa7ff}
+  .empty{color:#888;text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+<div id="amg">
+  <div class="tabs" id="tabs"></div>
+
+  <div class="stage">
+    <img id="amg_main" alt="미리보기">
+    <button id="amg_prev" class="nav" type="button" aria-label="이전">‹</button>
+    <button id="amg_next" class="nav" type="button" aria-label="다음">›</button>
+  </div>
+  <div id="amg_strip"></div>
+</div>
+
+<script>
+(async function(){
+  // 탭 정의 (탭 이름 / 폴더 매칭)
+  const GALLERIES = [
+    { label:'A-1타입', dir:'A-1images' },
+    { label:'A-2타입', dir:'A-2images' },
+    { label:'B타입',   dir:'Bimages'   }
+  ];
+
+  const OWNER='Objectivity1';   // 깃허브 사용자명
+  const REPO='artmug_obee';     // 리포 이름
+  const BRANCH='main';          // 브랜치
+
+  const tabsEl=document.getElementById('tabs');
+  const main=document.getElementById('amg_main');
+  const prev=document.getElementById('amg_prev');
+  const next=document.getElementById('amg_next');
+  const strip=document.getElementById('amg_strip');
+
+  // 숫자 정렬
+  const numKey=name=>{
+    const m=name.match(/^(\d+)\.gif$/i);
+    return m?parseInt(m[1],10):Number.POSITIVE_INFINITY;
+  };
+
+  async function listViaAPI(dir){
+    const url=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(dir)}?ref=${BRANCH}`;
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('api fail');
+    const data=await res.json();
+    return data.filter(f=>f.type==='file' && /\.gif$/i.test(f.name))
+               .sort((a,b)=>numKey(a.name)-numKey(b.name))
+               .map(f=>`${dir}/${f.name}`);
+  }
+
+  async function listByProbe(dir,maxTry=500){
+    const out=[]; let misses=0;
+    for(let i=1;i<=maxTry;i++){
+      const p=`${dir}/${i}.gif`;
+      try{
+        const r=await fetch(p,{method:'HEAD'});
+        if(r.ok){ out.push(p); misses=0; } else { misses++; }
+      }catch(_){ misses++; }
+      if(misses>=5 && out.length>0) break;
+    }
+    return out;
+  }
+
+  async function loadImages(dir){
+    try{ return await listViaAPI(dir); }
+    catch(e){ return await listByProbe(dir,999); }
+  }
+
+  function renderGallery(imgs){
+    if(!imgs.length){
+      strip.innerHTML='<div class="empty">이미지 없음</div>';
+      main.removeAttribute('src');
+      return;
+    }
+    strip.innerHTML='';
+    imgs.forEach((src,i)=>{
+      const b=document.createElement('button');
+      b.className='amg_th'; b.dataset.src=src;
+      const im=document.createElement('img');
+      im.src=src; im.alt=`썸네일 ${i+1}`;
+      b.appendChild(im); strip.appendChild(b);
+    });
+    const ths=Array.from(strip.querySelectorAll('.amg_th'));
+    let idx=0;
+    function highlight(){ths.forEach((b,k)=>b.classList.toggle('active',k===idx));}
+    function show(i){
+      idx=(i+imgs.length)%imgs.length;
+      main.src=imgs[idx]; highlight();
+      ths[idx].scrollIntoView({behavior:'smooth',inline:'center'});
+    }
+    ths.forEach((b,i)=>b.onclick=()=>show(i));
+    prev.onclick=()=>show(idx-1);
+    next.onclick=()=>show(idx+1);
+    main.ontouchstart=e=>startX=e.touches[0].clientX;
+    main.ontouchend=e=>{
+      const dx=e.changedTouches[0].clientX-startX;
+      if(Math.abs(dx)>40) show(idx+(dx<0?1:-1));
+    };
+    show(0);
+  }
+
+  async function activateTab(tab){
+    tabsEl.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+    tab.el.classList.add('active');
+    const imgs=await loadImages(tab.dir);
+    renderGallery(imgs);
+  }
+
+  // 탭 버튼 만들기
+  GALLERIES.forEach(g=>{
+    const btn=document.createElement('div');
+    btn.className='tab'; btn.textContent=g.label;
+    btn.onclick=()=>activateTab({...g,el:btn});
+    g.el=btn; tabsEl.appendChild(btn);
+  });
+
+  // 첫 탭 자동 로드
+  activateTab(GALLERIES[0]);
+})();
+</script>
+</body>
+</html>
