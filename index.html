@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GIF Galleries (Tabs + Auto, GIF only)</title>
+<title>GIF Galleries (Perf tuned)</title>
 <style>
   html,body{overscroll-behavior-y:none}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR','Malgun Gothic',Helvetica,Arial,sans-serif;margin:0}
@@ -17,9 +17,11 @@
   #amg_prev{left:8px} #amg_next{right:8px}
   #amg_strip{margin-top:10px;display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;overscroll-behavior:contain;touch-action:pan-x;scrollbar-gutter:stable both-edges}
   .amg_th{flex:0 0 calc((100% - 7*10px)/8);border:2px solid #ddd;border-radius:8px;padding:0;background:#fff;cursor:pointer;outline:none}
-  .amg_th img{display:block;width:100%;height:80px;object-fit:cover;border-radius:6px;pointer-events:none}
+  .amg_th img{display:block;width:100%;height:100px;object-fit:cover;border-radius:6px;pointer-events:none}
   .amg_th.active{border-color:#7aa7ff}
   .empty{color:#888;text-align:center;padding:20px 0}
+  .more-wrap{display:flex;justify-content:center;margin:10px 0}
+  .more{border:1px solid #ddd;background:#fafafa;border-radius:10px;padding:8px 14px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -27,114 +29,148 @@
   <div class="tabs" id="tabs"></div>
 
   <div class="stage">
-    <img id="amg_main" alt="미리보기">
+    <img id="amg_main" alt="미리보기" fetchpriority="high" decoding="async">
     <button id="amg_prev" class="nav" type="button" aria-label="이전">‹</button>
     <button id="amg_next" class="nav" type="button" aria-label="다음">›</button>
   </div>
   <div id="amg_strip"></div>
+  <div class="more-wrap"><button id="more" class="more" type="button">더 보기</button></div>
 </div>
 
 <script>
 (() => {
-  // 탭/폴더 정의 (각 타입 최대 60장 가정)
   const GALLERIES = [
     { label:'A-1타입', dir:'A-1images' },
     { label:'A-2타입', dir:'A-2images' },
     { label:'B타입',   dir:'Bimages'   }
   ];
   const MAX_PER_DIR = 60;
+  const BATCH = 12; // 한 번에 보여줄 썸네일 개수
 
   const tabsEl = document.getElementById('tabs');
   const main   = document.getElementById('amg_main');
   const prev   = document.getElementById('amg_prev');
   const next   = document.getElementById('amg_next');
   const strip  = document.getElementById('amg_strip');
+  const moreBtn= document.getElementById('more');
 
-  // 1) API 안 쓰고 1~60.gif만 HEAD 탐색 (연속 5번 없으면 중단)
+  // HEAD 프로빙: 연속 3번 없으면 (일부라도 찾은 이후) 중단 → 탐색시간 단축
   async function loadImagesByProbe(dir, maxTry=MAX_PER_DIR){
     const out=[]; let misses=0;
     for(let i=1;i<=maxTry;i++){
       const p = `${dir}/${i}.gif`;
       try{
-        const r = await fetch(p, { method:'HEAD', cache:'no-cache' });
-        if(r.ok){ out.push(p); misses=0; } else { misses++; }
-      }catch{ misses++; }
-      if(misses>=5 && out.length>0) break;
+        const r = await fetch(p, { method:'HEAD' }); // cache는 기본값(prefer-cache)
+        if(r.ok){ out.push(p); misses=0; }
+        else { if(out.length) misses++; }
+      }catch{ if(out.length) misses++; }
+      if(out.length && misses>=3) break;
     }
     return out;
   }
 
-  // 2) 썸네일 지연 로딩(IntersectionObserver)로 초기 네트워크 폭주 방지
+  // Lazy thumbnails with IO + batch append
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
     for(const e of entries){
       if(e.isIntersecting){
         const img = e.target;
-        if(img.dataset.src){ img.src = img.dataset.src; img.removeAttribute('data-src'); }
+        if(img.dataset.src){
+          // 스로틀링: requestIdleCallback / setTimeout으로 살짝 늦게 로드
+          const loadFn = () => { img.src = img.dataset.src; img.removeAttribute('data-src'); };
+          if('requestIdleCallback' in window){ requestIdleCallback(loadFn, {timeout:500}); }
+          else { setTimeout(loadFn, 0); }
+        }
         io.unobserve(img);
       }
     }
   }, { root: strip, rootMargin: '200px 0px', threshold: 0.01 }) : null;
 
-  function renderGallery(imgs){
+  let imgs = [];       // 현재 탭 이미지 리스트
+  let shown = 0;       // strip에 붙인 개수
+  let ths = [];        // 썸네일 버튼 목록 (DOM)
+
+  function appendBatch(){
+    const end = Math.min(shown + BATCH, imgs.length);
+    const ph  = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    for(let i=shown;i<end;i++){
+      const src = imgs[i];
+      const btn = document.createElement('button');
+      btn.className = 'amg_th';
+      btn.dataset.idx = i;
+
+      const im = document.createElement('img');
+      im.alt = `썸네일 ${i+1}`;
+      im.loading = 'lazy'; im.decoding = 'async';
+      im.dataset.src = src; // 보여질 때 로드
+      im.src = ph;
+      if(io) io.observe(im); else im.src = src;
+
+      btn.appendChild(im);
+      strip.appendChild(btn);
+      ths.push(btn);
+    }
+    shown = end;
+    moreBtn.style.display = shown < imgs.length ? '' : 'none';
+  }
+
+  // 메인 이미지 이웃만 살짝 프리로드 (폭주 방지)
+  function preloadNeighbor(idx){
+    [idx-1, idx+1].forEach(k=>{
+      if(k<0 || k>=imgs.length) return;
+      const url = imgs[k];
+      const img = new Image();
+      img.decoding = 'async';
+      img.loading = 'eager';
+      img.src = url;
+    });
+  }
+
+  let idx = 0;
+  function highlight(){ ths.forEach((el,k)=>el.classList.toggle('active', k===idx)); }
+  function show(i){
+    idx = (i + imgs.length) % imgs.length;
+    const src = imgs[idx];
+    if(main.src !== src) main.src = src;
+    highlight();
+    preloadNeighbor(idx);
+    // strip 안에서 보이게
+    try{ ths[idx]?.scrollIntoView({behavior:'smooth', inline:'center'}); }catch{}
+  }
+
+  function renderGallery(list){
+    imgs = list; shown = 0; ths = [];
+    strip.innerHTML = '';
     if(!imgs.length){
       strip.innerHTML = '<div class="empty">이미지 없음</div>';
       main.removeAttribute('src');
       prev.style.display = next.style.display = 'none';
+      moreBtn.style.display = 'none';
       return;
     }
     prev.style.display = next.style.display = '';
-
-    strip.innerHTML = '';
-    imgs.forEach((src, i) => {
-      const b  = document.createElement('button');
-      b.className = 'amg_th'; b.dataset.src = src;
-
-      const im = document.createElement('img');
-      im.alt = `썸네일 ${i+1}`;
-      im.loading = 'lazy';
-      im.decoding = 'async';
-      // lazy: 보일 때만 실제 src 세팅
-      im.dataset.src = src;
-      im.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='; // 1x1 gif
-
-      if(io) io.observe(im); else im.src = src;
-
-      b.appendChild(im);
-      strip.appendChild(b);
-    });
-
-    const ths = Array.from(strip.querySelectorAll('.amg_th'));
-    let idx = 0;
-    function highlight(){ ths.forEach((el,k)=>el.classList.toggle('active', k===idx)); }
-    function show(i){
-      idx = (i + imgs.length) % imgs.length;
-      const src = imgs[idx];
-      if(main.src !== src) main.src = src;
-      highlight();
-      try{ ths[idx].scrollIntoView({behavior:'smooth', inline:'center'}); }catch{}
-    }
-    ths.forEach((b,i)=> b.onclick = () => show(i));
-    prev.onclick = () => show(idx-1);
-    next.onclick = () => show(idx+1);
-
-    // 스와이프
-    let startX=null;
-    main.addEventListener('touchstart', e=>{ startX=e.touches[0].clientX; }, {passive:true});
-    main.addEventListener('touchend', e=>{
-      if(startX===null) return;
-      const dx=e.changedTouches[0].clientX-startX;
-      if(Math.abs(dx)>40) show(idx+(dx<0?1:-1));
-      startX=null;
-    }, {passive:true});
-
+    appendBatch();
     show(0);
   }
+
+  prev.onclick = ()=> show(idx-1);
+  next.onclick = ()=> show(idx+1);
+  moreBtn.onclick = appendBatch;
+
+  // 스와이프
+  let startX=null;
+  main.addEventListener('touchstart', e=>{ startX=e.touches[0].clientX; }, {passive:true});
+  main.addEventListener('touchend', e=>{
+    if(startX===null) return;
+    const dx=e.changedTouches[0].clientX-startX;
+    if(Math.abs(dx)>40) show(idx+(dx<0?1:-1));
+    startX=null;
+  }, {passive:true});
 
   async function activateTab(tab){
     tabsEl.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
     tab.el.classList.add('active');
-    const imgs = await loadImagesByProbe(tab.dir);
-    renderGallery(imgs);
+    const list = await loadImagesByProbe(tab.dir);
+    renderGallery(list);
   }
 
   // 탭 버튼
