@@ -128,7 +128,7 @@
   // --- GIF 첫 프레임을 dataURL(PNG)로 추출 ---
   async function gifFirstFrameDataURL(url){
     try{
-      if(!window.gifuct) throw new Error('gifuct not loaded');
+      if (!window.gifuct || !window.gifuct.parseGIF) return null;
       const { parseGIF, decompressFrames } = window.gifuct;
       const res = await fetch(url, {cache:'force-cache'});
       const buf = await res.arrayBuffer();
@@ -148,7 +148,6 @@
 
       return canvas.toDataURL('image/png');
     }catch(e){
-      // 실패하면 null 리턴 → 원본 GIF 그대로 썸네일 사용
       return null;
     }
   }
@@ -160,7 +159,6 @@
       return;
     }
     strip.innerHTML='';
-    const thumbPromises = [];
 
     imgs.forEach((src,i)=>{
       const b=document.createElement('button');
@@ -168,12 +166,10 @@
 
       const im=document.createElement('img');
       im.alt=`썸네일 ${i+1}`;
-      im.src=src; // 우선 원본 GIF (재생)로
-      // 그리고 가능하면 첫 프레임으로 교체
-      const p = gifFirstFrameDataURL(src).then(url=>{
-        if(url) im.src = url; // 정지된 첫 프레임 표시
+      im.src=src;
+      gifFirstFrameDataURL(src).then(url=>{
+        if(url) im.src = url;
       }).catch(()=>{});
-      thumbPromises.push(p);
 
       b.appendChild(im); strip.appendChild(b);
     });
@@ -184,13 +180,12 @@
     function show(i){
       idx=(i+imgs.length)%imgs.length;
       main.src=imgs[idx]; highlight();
-      try{ ths[idx].scrollIntoView({behavior:'smooth',inline:'center'}); }catch(_){}
+      try{ ths[idx].scrollIntoView({behavior:'smooth', inline:'center'}); }catch(_){}
     }
     ths.forEach((b,i)=>b.onclick=()=>show(i));
     prev.onclick=()=>show(idx-1);
     next.onclick=()=>show(idx+1);
 
-    // 터치 스와이프
     let startX=null;
     main.addEventListener('touchstart', e=>{ startX=e.touches[0].clientX; }, {passive:true});
     main.addEventListener('touchend', e=>{
@@ -200,7 +195,6 @@
       startX=null;
     }, {passive:true});
 
-    // 초기 표시 (썸네일 교체 기다릴 필요 없음)
     show(0);
   }
 
@@ -215,4 +209,13 @@
   GALLERIES.forEach(g=>{
     const btn=document.createElement('div');
     btn.className='tab'; btn.textContent=g.label;
-    btn.onclick
+    btn.onclick=()=>activateTab({...g,el:btn});
+    g.el=btn; tabsEl.appendChild(btn);
+  });
+
+  // 첫 탭 자동 로드
+  activateTab(GALLERIES[0]);
+})();
+</script>
+</body>
+</html>
