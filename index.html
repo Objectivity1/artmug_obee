@@ -22,6 +22,12 @@
   .amg_th.active{border-color:#7aa7ff}
   .empty{color:#888;text-align:center;padding:20px 0}
   .sentinel{flex:0 0 1px;width:1px;height:1px}
+  #amg_main,
+#amg_strip img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 </style>
 </head>
 <body>
@@ -310,6 +316,13 @@
   // 첫 탭
   activateTab({...GALLERIES[0], el:tabsEl.firstChild});
 })();
+  // 갤러리 이미지 우클릭 방지
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('#amg_main, #amg_strip img').forEach(img=>{
+    img.addEventListener('contextmenu', e=> e.preventDefault());
+  });
+});
+
 </script>
 </body>
 </html>
