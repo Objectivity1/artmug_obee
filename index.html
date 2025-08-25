@@ -324,20 +324,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
     img.addEventListener('contextmenu', e=> e.preventDefault());
   });
 });
-// 우클릭/드래그 전역 위임 (동적으로 생기는 썸네일까지 모두 커버)
+// 우클릭/드래그 전역 위임 (컨테이너 기준으로 모두 차단)
 document.addEventListener('contextmenu', (e) => {
   const t = e.target;
-  if (t && (t.closest('#amg_main') || t.closest('#amg_strip img'))) {
+  if (t && (t.closest('.stage') || t.closest('#amg_strip'))) {
     e.preventDefault();
   }
-}, true); // ← 캡처 단계에서 먼저 잡기
+}, true); // 캡처 단계에서 선차단
 
 document.addEventListener('dragstart', (e) => {
   const t = e.target;
-  if (t && (t.closest('#amg_main') || t.closest('#amg_strip img'))) {
+  if (t && (t.closest('.stage') || t.closest('#amg_strip'))) {
     e.preventDefault();
   }
 }, true);
+
 
 </script>
 </body>
