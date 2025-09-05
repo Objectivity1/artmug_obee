@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GIF Galleries (fast tabs + cache + slide)</title>
+<title>GIF Galleries (fast tabs + cache)</title>
 <link rel="preconnect" href="https://api.github.com">
 <style>
   html,body{overscroll-behavior-y:none}
@@ -12,18 +12,8 @@
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;justify-content:center}
   .tab{border:1px solid #ddd;background:#fafafa;border-radius:999px;padding:8px 14px;cursor:pointer;user-select:none}
   .tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
-
-  .stage{position:relative;border:1px solid #eee;height:450px;border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden}
-
-  /* 메인 이미지: GPU 전환으로 슬라이드 렉 최소화 */
-  #amg_main{
-    max-width:100%;max-height:100%;
-    width:auto;height:auto;
-    display:inline-block;border-radius:8px;pointer-events:none;object-fit:contain;
-    transition: transform .3s ease, opacity .3s ease;
-    will-change: transform, opacity;
-  }
-
+  .stage{position:relative;border:1px solid #eee;height:450px;border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center}
+  #amg_main{max-width:100%;max-height:100%;width:auto;height:auto;display:inline-block;border-radius:8px;pointer-events:none;object-fit:contain}
   .nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:999px;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:20px;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center}
   #amg_prev{left:8px} #amg_next{right:8px}
   #amg_strip{margin-top:10px;display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;overscroll-behavior:contain;touch-action:pan-x;scrollbar-gutter:stable both-edges}
@@ -32,15 +22,14 @@
   .amg_th.active{border-color:#7aa7ff}
   .empty{color:#888;text-align:center;padding:20px 0}
   .sentinel{flex:0 0 1px;width:1px;height:1px}
+#amg_main,
+#amg_strip img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none; /* iOS 길게 누르기 메뉴 막기 */
+  user-select: none;
+}
 
-  /* 우클릭/길게눌러 저장 방지 & 드래그 방지 */
-  #amg_main,
-  #amg_strip img {
-    -webkit-user-drag: none;
-    user-drag: none;
-    -webkit-touch-callout: none;
-    user-select: none;
-  }
 </style>
 </head>
 <body>
@@ -109,6 +98,7 @@
 
   async function listByProbe(dir, maxTry=MAX_PER_DIR){
     const out=[];
+    // 전수검사(조기 종료 없음): 캐시 미스일 때도 느리지 않도록 HEAD는 병렬 N개로 제한
     const CONC=8;
     let i=1;
     async function worker(){
@@ -126,16 +116,20 @@
   }
 
   async function getImages(dir){
+    // 1) 메모리 캐시
     if(memCache.has(dir)) return memCache.get(dir).list;
 
+    // 2) localStorage 캐시 우선 사용 → 즉시 표시 → 백그라운드 최신화
     const ls = loadLS();
     const entry = ls[dir];
     if(entry && Array.isArray(entry.list) && entry.list.length){
+      // 백그라운드 최신화(실패해도 무시)
       refreshInBG(dir, entry.etag).catch(()=>{});
       memCache.set(dir, { list: entry.list, etag: entry.etag, time: Date.now() });
       return entry.list;
     }
 
+    // 3) API 시도
     try{
       const { list, etag } = await listViaGithubAPI(dir);
       if(list.length){
@@ -143,11 +137,13 @@
         ls[dir]={list,etag}; saveLS(ls);
         return list;
       }
+      // API가 리스트 0개면 폴백
       const fb = await listByProbe(dir);
       memCache.set(dir,{list:fb,etag:'',time:Date.now()});
       ls[dir]={list:fb,etag:''}; saveLS(ls);
       return fb;
     }catch(_){
+      // API 실패 → 폴백
       const fb = await listByProbe(dir);
       memCache.set(dir,{list:fb,etag:'',time:Date.now()});
       const ls2=loadLS(); ls2[dir]={list:fb,etag:''}; saveLS(ls2);
@@ -161,6 +157,7 @@
       if(!oldEtag || etag !== oldEtag){
         memCache.set(dir,{list,etag,time:Date.now()});
         const ls = loadLS(); ls[dir]={list,etag}; saveLS(ls);
+        // 화면에 그 디렉토리 열려있다면 최신화
         if(current && current.dir===dir) renderGallery(list, /*keepIndex=*/true);
       }
     }catch(_){}
@@ -201,71 +198,15 @@
 
   function highlight(){ ths.forEach((el,k)=>el.classList.toggle('active',k===idx)); }
 
-  /* ---------- 슬라이드 전환 적용된 show() ---------- */
   function show(i){
     if(!imgs.length) return;
-
-    const newIdx = (i + imgs.length) % imgs.length;
-    if(newIdx === idx) return;
-
-    const nextSrc = imgs[newIdx];
-    const direction = newIdx > idx ? 1 : -1; // 오른쪽으로 가면 +1, 왼쪽이면 -1
-
-    // 이전 이미지 복제해서 위에 덮어놓고 슬라이드 아웃
-    const oldImg = main.cloneNode(true);
-    oldImg.removeAttribute('id');
-    oldImg.src = main.src || '';
-    oldImg.style.position = 'absolute';
-    oldImg.style.left = '12px';   // .stage padding 고려
-    oldImg.style.right = '12px';
-    oldImg.style.top = '12px';
-    oldImg.style.bottom = '12px';
-    oldImg.style.width = 'auto';
-    oldImg.style.height = 'auto';
-    oldImg.style.objectFit = 'contain';
-    oldImg.style.pointerEvents = 'none';
-    oldImg.style.transition = 'transform .3s ease, opacity .3s ease';
-    oldImg.style.transform = 'translateX(0)';
-    oldImg.style.opacity = '1';
-    oldImg.style.zIndex = '1';
-    main.parentNode.appendChild(oldImg);
-
-    // 다음 이미지 미리 로드해서 교체
-    const pre = new Image();
-    pre.decoding='async';
-    pre.onload = () => {
-      idx = newIdx;
-      // 새 이미지 초기 위치(조금 옆/투명)
-      main.style.transition = 'none';
-      main.style.transform = `translateX(${direction * 40}px)`;
-      main.style.opacity = '0';
-      main.src = nextSrc;
-
-      // 강제 리플로우로 초기 상태 확정
-      void main.offsetWidth;
-
-      // 애니메이션 시작
-      main.style.transition = 'transform .3s ease, opacity .3s ease';
-      requestAnimationFrame(()=>{
-        main.style.transform = 'translateX(0)';
-        main.style.opacity = '1';
-        oldImg.style.transform = `translateX(${-direction * 40}px)`;
-        oldImg.style.opacity = '0';
-      });
-
-      // 끝나면 이전 이미지 제거
-      setTimeout(()=> oldImg.remove(), 340);
-
-      // 나머지 UI 업데이트
-      highlight();
-      ensureThumbVisible(idx);
-      preloadNeighbor(idx);
-      if(idx >= shown-1) appendBatch();
-    };
-    // (이미 캐시돼 있으면 onload 바로 실행되어 체감 지연 거의 없음)
-    pre.src = nextSrc;
+    idx=(i+imgs.length)%imgs.length;
+    const src=imgs[idx];
+    if(main.src!==src) main.src=src;
+    highlight(); ensureThumbVisible(idx); preloadNeighbor(idx);
+    // 아직 그려지지 않은 끝 근처면 다음 배치 미리 붙임
+    if(idx >= shown-1) appendBatch();
   }
-  /* ----------------------------------------------- */
 
   function appendBatch(){
     if(isLoadingBatch || shown>=imgs.length) return;
@@ -328,6 +269,7 @@
   let current=null; // {label, dir, el}
   async function activateTab(tab){
     if(current?.dir===tab.dir){
+      // 같은 탭 다시 누르면 즉시 캐시 표시
       const cached = memCache.get(tab.dir)?.list || loadLS()[tab.dir]?.list || [];
       if(cached.length) renderGallery(cached, /*keepIndex=*/true);
       return;
@@ -348,12 +290,15 @@
     warmNeighbors(tab);
   }
 
+  // 다음/이전 탭 사전 프리페치
   function warmNeighbors(tab){
     const idxTab = GALLERIES.findIndex(g=>g.dir===tab.dir);
     [idxTab-1, idxTab+1].forEach(async ti=>{
       if(ti<0 || ti>=GALLERIES.length) return;
       const t = GALLERIES[ti];
+      // 이미 캐시돼 있으면 스킵
       if(memCache.has(t.dir)) return;
+      // 목록만 빠르게 가져오고 첫 1장만 예열
       const list = await getImages(t.dir);
       if(list && list[0]){
         const im = new Image();
@@ -373,19 +318,28 @@
   // 첫 탭
   activateTab({...GALLERIES[0], el:tabsEl.firstChild});
 })();
-  // 갤러리 이미지 우클릭 방지 (아트머그 호환: 컨테이너 단위)
+  // 갤러리 이미지 우클릭 방지
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('#amg_main, #amg_strip img').forEach(img=>{
+    img.addEventListener('contextmenu', e=> e.preventDefault());
+  });
+});
+// 우클릭/드래그 전역 위임 (컨테이너 기준으로 모두 차단)
 document.addEventListener('contextmenu', (e) => {
   const t = e.target;
   if (t && (t.closest('.stage') || t.closest('#amg_strip'))) {
     e.preventDefault();
   }
-}, true);
+}, true); // 캡처 단계에서 선차단
+
 document.addEventListener('dragstart', (e) => {
   const t = e.target;
   if (t && (t.closest('.stage') || t.closest('#amg_strip'))) {
     e.preventDefault();
   }
 }, true);
+
+
 </script>
 </body>
 </html>
