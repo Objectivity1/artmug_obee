@@ -209,28 +209,37 @@
   }
 
   function appendBatch(){
-    if(isLoadingBatch || shown>=imgs.length) return;
-    isLoadingBatch=true;
-    const end=Math.min(shown+BATCH, imgs.length);
-    const frag=document.createDocumentFragment();
-    for(let i=shown;i<end;i++){
-      const src=imgs[i];
-      const btn=document.createElement('button');
-      btn.className='amg_th'; btn.dataset.idx=i; btn.type='button';
-      btn.addEventListener('mousedown',e=>e.preventDefault());
-      btn.onclick=()=>show(i);
+  if(isLoadingBatch || shown>=imgs.length) return;
+  isLoadingBatch=true;
+  const end=Math.min(shown+BATCH, imgs.length);
+  const frag=document.createDocumentFragment();
+  for(let i=shown;i<end;i++){
+    const src=imgs[i]; // GIF 경로
+    const btn=document.createElement('button');
+    btn.className='amg_th'; btn.dataset.idx=i; btn.type='button';
+    btn.addEventListener('mousedown',e=>e.preventDefault());
+    btn.onclick=()=>show(i);
 
-      const im=document.createElement('img');
-      im.alt=`썸네일 ${i+1}`; im.loading='lazy'; im.decoding='async';
-      im.dataset.src=src; im.src=ph;
-      if(thumbIO) thumbIO.observe(im); else im.src=src;
+    const im=document.createElement('img');
+    im.alt=`썸네일 ${i+1}`;
+    im.loading='lazy';
+    im.decoding='async';
 
-      btn.appendChild(im); frag.appendChild(btn); ths.push(btn);
-    }
-    strip.appendChild(frag);
-    shown=end;
-    isLoadingBatch=false;
+    // PNG 우선: images → thumbs, 확장자 .gif → .png
+    const thumb = src.replace('images','thumbs').replace(/\.gif$/i, '.png');
+    im.src = thumb;
+    // PNG 없으면 GIF로 폴백
+    im.onerror = () => { im.src = src; };
+
+    btn.appendChild(im);
+    frag.appendChild(btn);
+    ths.push(btn);
   }
+  strip.appendChild(frag);
+  shown=end;
+  isLoadingBatch=false;
+}
+
 
   function renderGallery(list, keepIndex=false){
     imgs=list; shown=0; ths=[]; if(!keepIndex) idx=0;
